@@ -1,0 +1,187 @@
+# End-to-End E-Commerce Data Ingestion Pipeline (Python + SQL)
+
+An enterprise-ready, modular e-commerce data pipeline in Python and SQL. It ingests static bulk CSV datasets (e.g. Kaggle Olist Brazilian E-Commerce) and live REST API catalog data (DummyJSON API), performs automated schema validation and reject logging, loads into a SQLite Star Schema, executes analytical SQL transformations, and ranks product categories by demand-to-competition ratio in a final `seo_opportunity_report` SQL view.
+
+---
+
+## 🏗️ Architecture Overview
+
+```
++-----------------------------------------------------------------------------------+
+|                                  DATA SOURCES                                     |
+|  +-------------------------------------+      +--------------------------------+  |
+|  | Bulk CSVs (/data/raw/*.csv)         |      | Live REST API (DummyJSON)      |  |
+|  | Kaggle Olist Dataset (9 CSVs, ~1.5M) |      | https://dummyjson.com/products |  |
+|  +------------------+------------------+      +---------------+----------------+  |
++---------------------|-----------------------------------------|-------------------+
+                      |                                         |
+                      v                                         v
++-----------------------------------------------------------------------------------+
+|                                1. EXTRACT LAYER                                   |
+|  - csv_extractor.py (Scans /data/raw/, inspects columns, dynamic schema load)     |
+|  - api_extractor.py (Paginated REST calls, exponential backoff retry logic)       |
++----------------------------------------+------------------------------------------+
+                                         |
+                                         v
++-----------------------------------------------------------------------------------+
+|                          2. VALIDATE & CLEAN LAYER                                |
+|  - Schema checks, null handling, duplicate removal, type coercion                 |
+|  - Rejects pipeline: Failed rows written to `rejects` table with reason logs      |
++----------------------------------------+------------------------------------------+
+                                         |
+                                         v
++-----------------------------------------------------------------------------------+
+|                           3. STAGING & LOAD (SQLite)                              |
+|  - SQLAlchemy engine & sessions                                                   |
+|  - Staging tables: `staging_orders`, `staging_api_products`, etc.                 |
++----------------------------------------+------------------------------------------+
+                                         |
+                                         v
++-----------------------------------------------------------------------------------+
+|                             4. TRANSFORM LAYER                                    |
+|  Star Schema Dimensions & Fact Table:                                             |
+|   ├── dim_products (Unified CSV + API catalog)                                    |
+|   ├── dim_customers                                                               |
+|   ├── dim_category                                                                |
+|   ├── dim_time                                                                    |
+|   └── fact_orders                                                                 |
+|                                                                                   |
+|  Analytical Views:                                                                |
+|   ├── view_revenue_by_category_over_time                                          |
+|   ├── view_order_funnel_metrics                                                   |
+|   ├── view_category_demand_vs_supply                                              |
+|   ├── view_sentiment_vs_volume                                                    |
+|   └── seo_opportunity_report (Demand vs. Catalog size ranking ratio)              |
++----------------------------------------+------------------------------------------+
+                                         |
+                                         v
++-----------------------------------------------------------------------------------+
+|                           5. ORCHESTRATION & MONITORING                           |
+|  - `scheduler.py`: Scheduled API pulls & batch CSV ingestion                      |
+|  - `pipeline_monitoring`: Logs run duration, row counts (extracted/loaded/rejects) |
++-----------------------------------------------------------------------------------+
+```
+
+---
+
+## 📁 Project Structure
+
+```
+d:\Data-inges-P\
+├── data/
+│   ├── raw/                        # Target directory for incoming CSV files
+│   ├── processed/                  # Archival directory
+│   ├── ecommerce.db                # SQLite database generated by pipeline
+│   └── pipeline.log                # Production log file
+├── src/
+│   ├── __init__.py
+│   ├── config.py                   # Centralized paths and logging setup
+│   ├── db.py                       # SQLAlchemy engine & DDL execution engine
+│   ├── extract/
+│   │   ├── __init__.py
+│   │   ├── csv_extractor.py        # Dynamic scanner for /data/raw/*.csv
+│   │   └── api_extractor.py        # Exponential backoff fetcher for DummyJSON API
+│   ├── load/
+│   │   ├── __init__.py
+│   │   ├── staging_loader.py       # Ingests raw data & logs rejected rows
+│   │   └── star_schema_loader.py   # Cleans & loads Star Schema tables
+│   ├── transform/
+│   │   ├── __init__.py
+│   │   └── sql_transformer.py      # Executes SQL analytical view scripts
+│   └── orchestrator/
+│       ├── __init__.py
+│       └── scheduler.py            # Scheduler daemon & run execution logger
+├── sql/
+│   ├── 01_staging_tables.sql       # DDL for staging, rejects & monitoring tables
+│   ├── 02_star_schema.sql          # DDL for Star Schema (fact & dimensions)
+│   ├── 03_transformations.sql      # DDL for analytical views
+│   └── 04_seo_opportunity_report.sql # DDL for final SEO opportunity report view
+├── docs/
+│   ├── architecture.md             # Complete architecture diagram and breakdown
+│   ├── database_schema.md         # Data dictionary & ERD diagram
+│   └── query_insights.md           # Sample query results with plain-English insights
+├── main.py                         # Unified CLI entrypoint
+├── requirements.txt                # Python dependencies
+└── README.md                       # Documentation & setup guide
+```
+
+---
+
+## 🚀 Quickstart & Setup Instructions
+
+### 1. Prerequisites & Environment Setup
+Ensure Python 3.10+ is installed on your machine.
+
+```bash
+# Clone or navigate to project directory
+cd d:\Data-inges-P
+
+# Create a local virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+# Windows PowerShell:
+.\.venv\Scripts\Activate.ps1
+# Linux/macOS:
+source .venv/bin/activate
+
+# Install required dependencies
+pip install -r requirements.txt
+```
+
+### 2. Download Data Sources
+- **Bulk CSV Data**: Place Kaggle Olist CSV files into `/data/raw/` (or run `kagglehub.dataset_download("olistbr/brazilian-ecommerce")`). The `csv_extractor.py` module will automatically scan and detect any `.csv` files landing in `/data/raw/`.
+- **Live REST API**: No credentials needed! `api_extractor.py` automatically connects to `https://dummyjson.com/products`.
+
+---
+
+## 💻 Running the Pipeline
+
+### Run Full Pipeline Once (Default Mode)
+Executes extraction, validation, staging, star schema transformation, view creation, and logs monitoring metrics:
+
+```bash
+python main.py --run-once
+```
+
+### Run Pipeline with Analytical Console Reports
+Runs the pipeline and prints top results from `seo_opportunity_report` and `view_order_funnel_metrics` to the console:
+
+```bash
+python main.py --run-once --report
+```
+
+### Run Scheduled Daemon Mode
+Runs the pipeline immediately, then schedules recurring ingestion every 60 minutes (or custom interval):
+
+```bash
+python main.py --schedule --interval 60
+```
+
+---
+
+## 📊 Analytical Views & SEO Opportunity Analysis
+
+### 1. `seo_opportunity_report` View
+Ranks product categories by **Demand-to-Competition Ratio**, defined as:
+$$\text{Demand to Competition Ratio} = \frac{\text{Total Orders in Category}}{\text{Catalog Product Count in Category}}$$
+
+#### Key Insights & Plain-English Interpretation
+- **Top Opportunity Categories (`computers`, `tablets_printing_image`, `audio`)**: These categories display high order demand per available product listing. E-commerce marketing teams should prioritize SEO content, search ads, and landing page optimization for these categories because **competition per potential buyer conversion is lowest**, resulting in maximum ROAS.
+- **Saturated Categories (`bed_bath_table`)**: High volume (9,400+ orders) but heavy seller saturation (3,000+ catalog products). Broad head-keyword SEO will be costly; long-tail keyword strategies are recommended.
+
+---
+
+## 🛡️ Monitoring & Error Handling
+All pipeline executions log detailed run duration, row counts (extracted, loaded, rejected), and error messages to the `pipeline_monitoring` table in `data/ecommerce.db`. Any invalid or corrupted row is captured with JSON context in the `rejects` table.
+# E-Commerce Data Pipeline
+
+## Decision dashboard
+
+Run the pipeline at least once, then start the interactive dashboard:
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run streamlit_app.py
+```
+
+The dashboard reads the SQLite analytical views and includes an explainable category-priority scorecard. Install the updated dependencies first if `streamlit` and `plotly` are not already in the virtual environment.
