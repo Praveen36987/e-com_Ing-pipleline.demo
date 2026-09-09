@@ -6,55 +6,69 @@ This project implements a production-grade, end-to-end e-commerce data pipeline 
 
 ```mermaid
 flowchart TD
-    subgraph Data Sources
-        CSV[Bulk CSV Files /data/raw/*.csv\nOlist Kaggle Dataset]
-        API[Live REST API\nhttps://dummyjson.com/products]
+    subgraph sources["Data sources"]
+        CSV["Bulk CSV files<br/>data/raw/*.csv"]
+        API["DummyJSON products API"]
     end
 
-    subgraph 1. Extract Layer
-        CSV_EXT[CSV Extractor\nDynamic Directory Scanner]
-        API_EXT[API Extractor\nExponential Backoff & Retries]
+    subgraph extract["1. Extract layer"]
+        CSV_EXT["CSV extractor<br/>dynamic directory scan"]
+        API_EXT["API extractor<br/>retry and backoff"]
     end
 
-    subgraph 2. Validate & Clean
-        VAL[Schema Validation & Type Coercion]
-        REJ[(Rejects Table\nMalformed/Null Keys)]
+    subgraph validate["2. Validate and clean"]
+        VAL["Schema validation and type coercion"]
+        REJ["Rejects table"]
     end
 
-    subgraph 3. Load & Staging (SQLite)
-        STAGE[(Staging Tables\nstaging_*)]
+    subgraph load["3. Load and stage in SQLite"]
+        STAGE["Staging tables"]
     end
 
-    subgraph 4. Star Schema Storage
-        DIM_P[dim_products]
-        DIM_C[dim_customers]
-        DIM_CAT[dim_category]
-        DIM_T[dim_time]
-        FACT_O[fact_orders]
+    subgraph model["4. Star schema"]
+        DIM_P["dim_products"]
+        DIM_C["dim_customers"]
+        DIM_CAT["dim_category"]
+        DIM_T["dim_time"]
+        FACT_O["fact_orders"]
     end
 
-    subgraph 5. SQL Transformations & Analytics
-        REV_V[view_revenue_by_category_over_time]
-        FUN_V[view_order_funnel_metrics]
-        SENT_V[view_sentiment_vs_volume]
-        SEO_V[seo_opportunity_report]
+    subgraph analytics["5. SQL analytics"]
+        REV_V["Revenue by category and time"]
+        FUN_V["Order funnel metrics"]
+        SENT_V["Sentiment versus volume"]
+        SEO_V["SEO opportunity report"]
+        SCORE["Decision category scorecard"]
     end
 
-    subgraph 6. Orchestration & Monitoring
-        SCHED[Scheduler / Main CLI]
-        MON[(pipeline_monitoring)]
+    subgraph orchestration["6. Orchestration and monitoring"]
+        SCHED["Scheduler and CLI"]
+        MON["Pipeline monitoring"]
     end
 
     CSV --> CSV_EXT
     API --> API_EXT
     CSV_EXT --> VAL
     API_EXT --> VAL
-    VAL -- Invalid Rows --> REJ
-    VAL -- Valid Rows --> STAGE
-    STAGE --> DIM_P & DIM_C & DIM_CAT & DIM_T
-    DIM_P & DIM_C & DIM_CAT & DIM_T --> FACT_O
-    FACT_O --> REV_V & FUN_V & SENT_V & SEO_V
-    SCHED --> CSV_EXT & API_EXT & STAGE & FACT_O
+    VAL -->|Invalid rows| REJ
+    VAL -->|Valid rows| STAGE
+    STAGE --> DIM_P
+    STAGE --> DIM_C
+    STAGE --> DIM_CAT
+    STAGE --> DIM_T
+    DIM_P --> FACT_O
+    DIM_C --> FACT_O
+    DIM_CAT --> FACT_O
+    DIM_T --> FACT_O
+    FACT_O --> REV_V
+    FACT_O --> FUN_V
+    FACT_O --> SENT_V
+    FACT_O --> SEO_V
+    FACT_O --> SCORE
+    SCHED --> CSV_EXT
+    SCHED --> API_EXT
+    SCHED --> STAGE
+    SCHED --> FACT_O
     SCHED --> MON
 ```
 
