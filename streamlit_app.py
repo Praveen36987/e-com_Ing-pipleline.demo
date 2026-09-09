@@ -72,6 +72,22 @@ def filtered_metrics(start_date: str, end_date: str, categories: list[str]) -> p
     )
 
 
+def normalize_monitoring_metrics(monitoring: pd.DataFrame) -> pd.DataFrame:
+    """Convert legacy SQLite binary integers into displayable native integers."""
+    numeric_columns = ("id", "extracted_rows", "loaded_rows", "rejected_rows")
+    normalized = monitoring.copy()
+
+    def to_integer(value: object) -> object:
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            return int.from_bytes(bytes(value), byteorder="little", signed=True)
+        return value
+
+    for column in numeric_columns:
+        if column in normalized.columns:
+            normalized[column] = pd.to_numeric(normalized[column].map(to_integer), errors="coerce").astype("Int64")
+    return normalized
+
+
 def main() -> None:
     st.title("🛍️ E-commerce Decision Hub")
 
@@ -168,7 +184,9 @@ def main() -> None:
         st.info("Interpret this as a prioritisation tool, not an individual-customer purchase prediction. Individual recommendations require customer-level browsing, search, cart, and repeat-purchase events.")
 
     with health_tab:
-        monitoring = load_data("SELECT * FROM pipeline_monitoring ORDER BY id DESC LIMIT 20")
+        monitoring = normalize_monitoring_metrics(
+            load_data("SELECT * FROM pipeline_monitoring ORDER BY id DESC LIMIT 20")
+        )
         rejects = load_data("SELECT source_table, COUNT(*) AS rejected_rows FROM rejects GROUP BY source_table ORDER BY rejected_rows DESC")
         st.subheader("Latest pipeline runs")
         st.dataframe(monitoring, use_container_width=True, hide_index=True)

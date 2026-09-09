@@ -118,10 +118,10 @@ class PipelineOrchestrator:
                 "status": status,
                 "start": start_time,
                 "end": end_time,
-                "duration": duration,
-                "extracted": extracted,
-                "loaded": loaded,
-                "rejected": rejected,
+                "duration": float(duration),
+                "extracted": int(extracted),
+                "loaded": int(loaded),
+                "rejected": int(rejected),
                 "error": error
             })
 
