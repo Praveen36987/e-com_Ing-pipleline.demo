@@ -9,7 +9,9 @@ import streamlit as st
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DATABASE_PATH = PROJECT_ROOT / "data" / "ecommerce.db"
+LOCAL_DATABASE_PATH = PROJECT_ROOT / "data" / "ecommerce.db"
+DEMO_DATABASE_PATH = PROJECT_ROOT / "data" / "demo_ecommerce.db"
+DATABASE_PATH = LOCAL_DATABASE_PATH if LOCAL_DATABASE_PATH.exists() else DEMO_DATABASE_PATH
 
 st.set_page_config(
     page_title="E-commerce Decision Hub",
@@ -72,11 +74,15 @@ def filtered_metrics(start_date: str, end_date: str, categories: list[str]) -> p
 
 def main() -> None:
     st.title("🛍️ E-commerce Decision Hub")
-    st.caption("Historical category intelligence from the Olist pipeline — updated whenever the pipeline refreshes.")
 
     if not DATABASE_PATH.exists():
-        st.error("Database not found. Run `python main.py --run-once` before launching the dashboard.")
+        st.error("Database not found. Run `python main.py --run-once` locally or add the demo database for deployment.")
         st.stop()
+
+    if DATABASE_PATH == DEMO_DATABASE_PATH:
+        st.caption("Hosted analytics snapshot from the Olist pipeline. It retains the dashboard's full transformed facts and SQL views.")
+    else:
+        st.caption("Historical category intelligence from the Olist pipeline — updated whenever the pipeline refreshes.")
 
     categories, min_date, max_date = available_filters()
     with st.sidebar:

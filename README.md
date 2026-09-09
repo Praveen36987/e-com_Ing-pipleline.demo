@@ -138,7 +138,9 @@ Key SQL outputs:
 ```text
 .
 ├── data/                         # Local raw data, database, and pipeline outputs (gitignored)
+│   └── demo_ecommerce.db          # Full analytics snapshot used by Streamlit Community Cloud
 ├── docs/                         # Architecture, schema, and query notes
+├── scripts/                      # Reproducible utilities, including demo snapshot builder
 ├── sql/                          # Staging, star schema, transformations, and decision-KPI SQL
 ├── src/
 │   ├── extract/                  # Dynamic CSV and API extractors
@@ -190,7 +192,17 @@ python -m streamlit run streamlit_app.py
 
 ## Deployment note
 
-This repository intentionally excludes the raw CSV files and local SQLite database. Before deploying to Streamlit Community Cloud, use a small approved demo database or connect the dashboard to a managed database. Do not publish raw data or secrets to a public repository.
+This repository excludes the raw CSV files and the 107 MB local pipeline database. It includes `data/demo_ecommerce.db`, a 36 MB analytics-only snapshot created from the same transformed facts, products, dates, categories, monitoring records, and SQL views used by the dashboard. Verification confirms that its fact count, product count, date count, category-score count, and total recorded revenue match the local analytics database.
+
+The dashboard automatically uses the full local database when it is available and the hosted snapshot when it is not. This makes the repository ready for Streamlit Community Cloud without exposing raw files or secrets.
+
+To rebuild the hosted snapshot after a local pipeline refresh:
+
+```powershell
+python scripts/create_demo_database.py
+```
+
+Do not publish raw data or secrets to a public repository.
 
 ## Documentation
 

@@ -7,6 +7,7 @@ __pycache__/
 data/raw/
 data/processed/
 data/*.db
+!data/demo_ecommerce.db
 data/*.log
 
 # Editor and operating-system files
